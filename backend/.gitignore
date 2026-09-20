@@ -1,0 +1,16 @@
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+*.sqlite
+*.sqlite3
+agroshield.db
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+.env.*
+!.env.example

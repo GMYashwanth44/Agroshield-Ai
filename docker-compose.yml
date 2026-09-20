@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agroshield_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=agroshield_ai_super_secret_jwt_key_sih_2026
+      - DATABASE_URL=sqlite:///./agroshield.db
+      - DEMO_MODE=True
+    volumes:
+      - ./backend/agroshield.db:/app/agroshield.db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: agroshield_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
