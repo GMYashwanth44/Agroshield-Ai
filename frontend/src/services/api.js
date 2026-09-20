@@ -1,6 +1,8 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL
-  ? import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, '')
-  : '/api';
+let rawBase = import.meta.env.VITE_API_BASE_URL || '/api';
+if (rawBase.includes('agroshield-api.onrender.com')) {
+  rawBase = rawBase.replace('agroshield-api.onrender.com', 'agroshield-ai.onrender.com');
+}
+const API_BASE = rawBase.replace(/\/+$/, '');
 
 export const getAuthToken = () => localStorage.getItem('agroshield_token');
 export const setAuthToken = (token) => localStorage.setItem('agroshield_token', token);
