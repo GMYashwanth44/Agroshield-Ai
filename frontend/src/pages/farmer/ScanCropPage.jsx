@@ -1,5 +1,5 @@
-﻿import React, { useState, useRef } from 'react';
-import { Camera, Image as ImageIcon, Sparkles, RefreshCw, Upload, AlertCircle, CheckCircle, Video } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, Image as ImageIcon, Sparkles, RefreshCw, Upload, AlertCircle, CheckCircle, Video, MapPin } from 'lucide-react';
 import { useTranslation } from '../../i18n';
 import { api } from '../../services/api';
 import QualityCheckModal from '../../components/farmer/QualityCheckModal';
@@ -38,10 +38,42 @@ export const ScanCropPage = ({ onScanComplete, onCancel }) => {
   const [qualityModalOpen, setQualityModalOpen] = useState(false);
   const [qualityResult, setQualityResult] = useState(null);
   const [activeTab, setActiveTab] = useState('picker'); // 'picker' or 'camera'
+  const [gpsLocation, setGpsLocation] = useState(null);
+  const [gpsStatus, setGpsStatus] = useState('idle'); // idle, locating, ready, error
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Request browser geolocation on component mount
+  useEffect(() => {
+    fetchCurrentLocation();
+  }, []);
+
+  const fetchCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setGpsStatus('error');
+      return;
+    }
+    setGpsStatus('locating');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsLocation({
+          lat: Number(pos.coords.latitude.toFixed(6)),
+          lng: Number(pos.coords.longitude.toFixed(6)),
+          accuracy: Math.round(pos.coords.accuracy * 10) / 10,
+          timestamp: pos.timestamp,
+          isReal: true
+        });
+        setGpsStatus('ready');
+      },
+      (err) => {
+        console.warn('Geolocation acquisition error:', err.message);
+        setGpsStatus('error');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   // Start Camera Stream
   const startCamera = async () => {
@@ -141,7 +173,8 @@ export const ScanCropPage = ({ onScanComplete, onCancel }) => {
         onScanComplete({
           ...res.data,
           imageFile: selectedImage,
-          previewUrl
+          previewUrl,
+          gpsCoords: gpsLocation
         });
       } else {
         alert(res.message || 'Disease detection failed.');
@@ -163,6 +196,30 @@ export const ScanCropPage = ({ onScanComplete, onCancel }) => {
         <p className="text-xs sm:text-sm text-slate-500">
           Point your camera directly at the diseased leaf or upload an existing image from your gallery.
         </p>
+
+        {/* Real GPS Geolocation Status Pill */}
+        <div className="pt-2 flex items-center justify-center">
+          {gpsLocation ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full text-xs font-medium shadow-xs">
+              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+              <span>📍 GPS Attached: {gpsLocation.lat.toFixed(4)}°, {gpsLocation.lng.toFixed(4)}° (±{gpsLocation.accuracy}m)</span>
+            </div>
+          ) : gpsStatus === 'locating' ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 text-blue-800 rounded-full text-xs font-medium animate-pulse">
+              <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
+              <span>Detecting field GPS coordinates...</span>
+            </div>
+          ) : (
+            <button
+              onClick={fetchCurrentLocation}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-medium transition cursor-pointer"
+            >
+              <MapPin className="w-3.5 h-3.5 text-slate-500" />
+              <span>Enable GPS for Field Geotagging</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Two Separate Options Prominently Displayed (Prompt Spec Requirement) */}

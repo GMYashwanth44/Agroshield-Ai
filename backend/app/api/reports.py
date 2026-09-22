@@ -19,6 +19,11 @@ def create_report(
     """
     Submits a disease report with GPS location and AI diagnosis metrics.
     """
+    if data.latitude < -90.0 or data.latitude > 90.0:
+        raise HTTPException(status_code=400, detail="Invalid latitude. Must be between -90.0 and 90.0.")
+    if data.longitude < -180.0 or data.longitude > 180.0:
+        raise HTTPException(status_code=400, detail="Invalid longitude. Must be between -180.0 and 180.0.")
+
     report = DiseaseReport(
         farmer_id=current_user.id if current_user else None,
         crop_name=data.crop_name,
@@ -35,6 +40,7 @@ def create_report(
         mask_url=data.mask_url,
         farmer_notes=data.farmer_notes,
         is_offline=data.is_offline or False,
+        is_demo=False,
         status="pending"
     )
     db.add(report)
@@ -49,6 +55,7 @@ def get_reports(
     severity: Optional[str] = None,
     district: Optional[str] = None,
     status: Optional[str] = None,
+    is_demo: Optional[bool] = None,
     limit: int = Query(100, le=1500),
     offset: int = 0,
     db: Session = Depends(get_db)
@@ -57,6 +64,8 @@ def get_reports(
     Returns disease reports with filters. Farmer personal details are anonymized.
     """
     q = db.query(DiseaseReport)
+    if is_demo is not None:
+        q = q.filter(DiseaseReport.is_demo == is_demo)
     if crop and crop != "all":
         q = q.filter(DiseaseReport.crop_name.ilike(f"%{crop}%"))
     if disease and disease != "all":

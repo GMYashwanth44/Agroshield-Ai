@@ -1,4 +1,4 @@
-﻿import random
+import random
 from datetime import datetime, timedelta
 from app.database.session import SessionLocal, engine, Base
 from app.models.models import (
@@ -525,6 +525,7 @@ def seed_database():
                 farmer_notes=f"Reported symptoms on {c['crop']} leaf.",
                 officer_diagnosis=officer_diag,
                 is_offline=False,
+                is_demo=True,
                 created_at=created_time
             )
             reports_to_add.append(rep)

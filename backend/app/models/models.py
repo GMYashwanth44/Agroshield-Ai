@@ -114,6 +114,7 @@ class DiseaseReport(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     # Differentiating Features V2 Extensions
+    is_demo = Column(Boolean, default=False, nullable=False)
     crop_health_score = Column(Float, nullable=True) # 0 to 100
     future_risk_level = Column(String(50), nullable=True) # LOW, MEDIUM, HIGH
     parent_report_id = Column(Integer, ForeignKey("disease_reports.id"), nullable=True) # For Before vs After recovery monitoring

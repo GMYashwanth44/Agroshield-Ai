@@ -35,9 +35,24 @@ export const QualityCheckModal = ({ isOpen, onClose, result, onProceed, onRetry 
           </div>
         </div>
 
-        <p className={`text-xs p-3 rounded-xl border ${isPassed ? 'bg-emerald-50 text-emerald-950 border-emerald-200' : 'bg-rose-50 text-rose-950 border-rose-200'}`}>
+        <p className={`text-xs p-3 rounded-xl border font-medium ${isPassed ? 'bg-emerald-50 text-emerald-950 border-emerald-200' : 'bg-rose-50 text-rose-950 border-rose-200'}`}>
           {result.message}
         </p>
+
+        {/* Detected Issues List if failed */}
+        {!isPassed && issues.length > 0 && (
+          <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-1 text-xs">
+            <span className="font-bold text-rose-900 block">Issues Detected:</span>
+            <ul className="space-y-1 text-rose-800 text-[11px]">
+              {issues.map((issue, idx) => (
+                <li key={idx} className="flex items-start gap-1.5">
+                  <span className="text-rose-600 font-bold">•</span>
+                  <span>{issue}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Quality Metrics Grid */}
         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -62,7 +77,7 @@ export const QualityCheckModal = ({ isOpen, onClose, result, onProceed, onRetry 
           <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
             <span className="text-slate-500 block text-[11px]">Leaf Foliage Ratio</span>
             <span className="font-bold text-slate-800">
-              {metrics.foliage_ratio ? `${metrics.foliage_ratio}% of frame` : 'Verified'}
+              {metrics.foliage_ratio !== undefined ? `${metrics.foliage_ratio}% of frame` : 'Verified'}
             </span>
           </div>
         </div>
@@ -97,17 +112,11 @@ export const QualityCheckModal = ({ isOpen, onClose, result, onProceed, onRetry 
           ) : (
             <div className="w-full flex gap-2">
               <button
-                onClick={onProceed}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-3 rounded-xl transition text-xs"
-              >
-                Proceed Anyway
-              </button>
-              <button
                 onClick={onRetry}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-3 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition text-xs"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-3 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition text-xs"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Retake Photo</span>
+                <span>Retake Photo / Upload New Image</span>
               </button>
             </div>
           )}

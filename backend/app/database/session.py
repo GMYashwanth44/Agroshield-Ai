@@ -34,6 +34,8 @@ def run_migrations():
             inspector = inspect(engine)
             if "disease_reports" in inspector.get_table_names():
                 existing = [col["name"] for col in inspector.get_columns("disease_reports")]
+                if "is_demo" not in existing:
+                    conn.execute(text("ALTER TABLE disease_reports ADD COLUMN is_demo BOOLEAN DEFAULT 0"))
                 if "crop_health_score" not in existing:
                     conn.execute(text("ALTER TABLE disease_reports ADD COLUMN crop_health_score FLOAT"))
                 if "future_risk_level" not in existing:

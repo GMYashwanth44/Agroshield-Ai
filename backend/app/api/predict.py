@@ -56,13 +56,30 @@ async def api_predict(image: UploadFile = File(...)):
         return {
             "success": False,
             "quality_passed": False,
-            "message": result.get("message", "Disease prediction failed."),
-            "issues": result.get("issues", []),
+            "message": result.get("message", "Invalid Image: Please upload a clear crop/plant image."),
+            "issues": result.get("issues", ["Invalid image"]),
             "metrics": result.get("metrics", {}),
+            "crop": "None",
+            "disease": "None",
+            "confidence": 0,
+            "severity": "None",
+            "status": "rejected",
             "data": None
         }
 
-    return result
+    report_data = result.get("data", {})
+    return {
+        "success": True,
+        "quality_passed": True,
+        "message": result.get("message", "AI analysis completed successfully."),
+        "crop": report_data.get("crop"),
+        "disease": report_data.get("disease"),
+        "confidence": report_data.get("confidence", 0),
+        "confidence_pct": report_data.get("confidence_pct", 0),
+        "severity": report_data.get("severity"),
+        "status": report_data.get("status"),
+        "data": report_data
+    }
 
 @router.post("/severity")
 async def api_severity(image: UploadFile = File(...)):

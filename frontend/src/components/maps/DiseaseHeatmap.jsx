@@ -25,12 +25,15 @@ export const DiseaseHeatmap = ({
   const [filterCrop, setFilterCrop] = useState('all');
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [filterDisease, setFilterDisease] = useState('all');
+  const [filterSource, setFilterSource] = useState('all');
   const [showProjections, setShowProjections] = useState(true);
 
   const filteredReports = reports.filter(r => {
     if (filterCrop !== 'all' && !r.crop_name?.toLowerCase().includes(filterCrop.toLowerCase())) return false;
     if (filterSeverity !== 'all' && !r.severity?.toLowerCase().includes(filterSeverity.toLowerCase())) return false;
     if (filterDisease !== 'all' && !r.disease_name?.toLowerCase().includes(filterDisease.toLowerCase())) return false;
+    if (filterSource === 'verified' && (r.is_demo === true || r.is_demo === 1)) return false;
+    if (filterSource === 'demo' && !(r.is_demo === true || r.is_demo === 1)) return false;
     return true;
   });
 
@@ -42,6 +45,16 @@ export const DiseaseHeatmap = ({
           <Filter className="w-3.5 h-3.5 text-emerald-600" />
           <span>Filters:</span>
         </div>
+
+        <select
+          value={filterSource}
+          onChange={(e) => setFilterSource(e.target.value)}
+          className="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 focus:ring-1 focus:ring-emerald-500 font-medium text-slate-800 font-semibold"
+        >
+          <option value="all">All Surveillance Data</option>
+          <option value="verified">Verified Farmer Reports</option>
+          <option value="demo">Demo Data Only</option>
+        </select>
 
         <select
           value={filterCrop}
@@ -84,7 +97,7 @@ export const DiseaseHeatmap = ({
         <button
           type="button"
           onClick={() => setShowProjections(!showProjections)}
-          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition ${
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer ${
             showProjections
               ? 'bg-rose-50 text-rose-700 border-rose-300'
               : 'bg-slate-100 text-slate-500 border-slate-200'
@@ -118,6 +131,7 @@ export const DiseaseHeatmap = ({
           {filteredReports.map((report) => {
             const color = RISK_COLORS[report.severity] || '#F97316';
             const radius = report.severity === 'Severe' ? 10 : report.severity === 'Moderate' ? 8 : 6;
+            const isDemo = report.is_demo === true || report.is_demo === 1;
 
             return (
               <CircleMarker
@@ -126,22 +140,38 @@ export const DiseaseHeatmap = ({
                 radius={radius}
                 pathOptions={{
                   fillColor: color,
-                  fillOpacity: 0.75,
-                  color: '#ffffff',
-                  weight: 1.5
+                  fillOpacity: isDemo ? 0.70 : 0.95,
+                  color: isDemo ? '#ffffff' : '#047857',
+                  weight: isDemo ? 1.5 : 2.5
                 }}
               >
                 <Tooltip direction="top" offset={[0, -5]} opacity={0.9}>
                   <div className="text-[11px] font-sans">
-                    <span className="font-bold text-slate-900 block">{report.crop_name} - {report.disease_name}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold text-slate-900">{report.crop_name} - {report.disease_name}</span>
+                      <span className={`text-[9px] font-bold px-1 py-0.2 rounded ${isDemo ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                        {isDemo ? 'DEMO' : 'VERIFIED'}
+                      </span>
+                    </div>
                     <span className="text-slate-600 block">Severity: {report.severity}</span>
                     <span className="text-slate-500 block text-[10px]">{report.village}, {report.district}</span>
                   </div>
                 </Tooltip>
                 <Popup>
-                  <div className="p-1 space-y-1.5 font-sans min-w-[200px]">
+                  <div className="p-1 space-y-1.5 font-sans min-w-[210px]">
                     <div className="flex items-center justify-between border-b pb-1">
-                      <span className="font-bold text-xs text-slate-900">{report.crop_name}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-slate-900">{report.crop_name}</span>
+                        {isDemo ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                            DEMO DATA
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            VERIFIED FARMER REPORT
+                          </span>
+                        )}
+                      </div>
                       <span
                         className="text-[10px] font-bold px-1.5 py-0.5 rounded text-white"
                         style={{ backgroundColor: color }}
@@ -153,8 +183,9 @@ export const DiseaseHeatmap = ({
                       <p><strong>Disease:</strong> {report.disease_name}</p>
                       <p><strong>AI Confidence:</strong> {report.confidence ? `${(report.confidence * 100).toFixed(1)}%` : '94.7%'}</p>
                       <p><strong>Area:</strong> {report.village}, {report.district}</p>
+                      <p><strong>GPS:</strong> {Number(report.latitude).toFixed(4)}°, {Number(report.longitude).toFixed(4)}°</p>
                       <p className="text-[10px] text-slate-500 italic mt-1 pt-1 border-t border-slate-100">
-                        Farmer identity and GPS protected for community privacy
+                        {isDemo ? 'Regional synthetic baseline for epidemiological modeling' : 'Field geo-tagged by local farmer (identity protected)'}
                       </p>
                     </div>
                   </div>

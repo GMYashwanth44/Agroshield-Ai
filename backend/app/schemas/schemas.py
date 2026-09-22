@@ -1,4 +1,4 @@
-﻿from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -80,6 +80,7 @@ class DiseaseReportCreate(BaseModel):
     mask_url: Optional[str] = None
     farmer_notes: Optional[str] = None
     is_offline: Optional[bool] = False
+    is_demo: Optional[bool] = False
 
 class DiseaseReportResponse(BaseModel):
     id: int
@@ -91,6 +92,7 @@ class DiseaseReportResponse(BaseModel):
     status: str
     latitude: float
     longitude: float
+    location_accuracy: Optional[float] = 10.0
     district: Optional[str]
     village: Optional[str]
     image_url: Optional[str]
@@ -99,6 +101,7 @@ class DiseaseReportResponse(BaseModel):
     officer_diagnosis: Optional[str]
     officer_comments: Optional[str]
     is_offline: bool
+    is_demo: Optional[bool] = False
     created_at: datetime
 
     class Config:

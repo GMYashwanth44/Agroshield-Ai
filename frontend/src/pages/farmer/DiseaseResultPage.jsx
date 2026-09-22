@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, AlertTriangle, MapPin, Share2, Download, Send,
-  Sparkles, CheckCircle2, ShoppingBag, Eye, Layers, ChevronRight, HelpCircle
+  Sparkles, CheckCircle2, ShoppingBag, Eye, Layers, ChevronRight, HelpCircle,
+  RefreshCw, Crosshair, AlertCircle
 } from 'lucide-react';
+import { MapContainer, TileLayer, CircleMarker, Circle, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useTranslation } from '../../i18n';
 import { api } from '../../services/api';
 import { offlineStore } from '../../services/offlineStore';
@@ -16,6 +19,16 @@ import AskAgroShieldDrawer from '../../components/farmer/AskAgroShieldDrawer';
 import RequestExpertReviewModal from '../../components/farmer/RequestExpertReviewModal';
 import { MessageSquare, UserCheck, Bot } from 'lucide-react';
 
+function MiniMapRecenter({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center && center[0] && center[1]) {
+      map.setView(center, 14);
+    }
+  }, [center, map]);
+  return null;
+}
+
 export const DiseaseResultPage = ({ result, onSubmitted, onNavigateMarketplace }) => {
   const { t } = useTranslation();
   const [showMask, setShowMask] = useState(false);
@@ -28,13 +41,71 @@ export const DiseaseResultPage = ({ result, onSubmitted, onNavigateMarketplace }
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [farmerNotes, setFarmerNotes] = useState('');
-  const [gpsCoords, setGpsCoords] = useState({
-    lat: 13.3392,
-    lng: 78.2139,
-    accuracy: 4.5,
-    village: 'Srinivaspur',
-    district: 'Kolar'
+
+  // Real GPS Geolocation State
+  const [gpsCoords, setGpsCoords] = useState(() => {
+    if (result.gpsCoords && result.gpsCoords.lat && result.gpsCoords.lng) {
+      return {
+        lat: result.gpsCoords.lat,
+        lng: result.gpsCoords.lng,
+        accuracy: result.gpsCoords.accuracy || 5.0,
+        village: 'Detected Location',
+        district: 'Current Region',
+        isReal: true
+      };
+    }
+    return {
+      lat: 13.3392,
+      lng: 78.2139,
+      accuracy: 10.0,
+      village: 'Srinivaspur',
+      district: 'Kolar',
+      isReal: false
+    };
   });
+  const [isLocating, setIsLocating] = useState(false);
+  const [gpsErrorMsg, setGpsErrorMsg] = useState(null);
+
+  // Auto-acquire live location if not already provided
+  useEffect(() => {
+    if (!result.gpsCoords) {
+      fetchLiveGPS();
+    }
+  }, []);
+
+  const fetchLiveGPS = () => {
+    if (!navigator.geolocation) {
+      setGpsErrorMsg('Browser or device does not support GPS geolocation.');
+      return;
+    }
+    setIsLocating(true);
+    setGpsErrorMsg(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        const accuracy = Math.round(pos.coords.accuracy * 10) / 10;
+        setGpsCoords((prev) => ({
+          ...prev,
+          lat,
+          lng,
+          accuracy,
+          isReal: true
+        }));
+        setIsLocating(false);
+      },
+      (err) => {
+        console.warn('Geolocation failed:', err.message);
+        let msg = 'Could not acquire GPS coordinates.';
+        if (err.code === 1) msg = 'Location permission denied by browser. Please enable GPS permissions.';
+        else if (err.code === 2) msg = 'Location position unavailable. Check GPS sensor.';
+        else if (err.code === 3) msg = 'GPS acquisition timed out. Please try again.';
+        setGpsErrorMsg(msg);
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   React.useEffect(() => {
     if (!actionPlan) {
@@ -51,7 +122,7 @@ export const DiseaseResultPage = ({ result, onSubmitted, onNavigateMarketplace }
       .catch(() => {});
   }, [result.crop, result.disease, result.severity]);
 
-  const isLowConfidence = result.is_low_confidence || (result.confidence && result.confidence < 0.70);
+  const isLowConfidence = result.is_low_confidence || (result.confidence && result.confidence < 70);
 
   // Submit report with GPS location
   const handleSubmitReport = async () => {
@@ -59,7 +130,7 @@ export const DiseaseResultPage = ({ result, onSubmitted, onNavigateMarketplace }
     const reportPayload = {
       crop_name: result.crop,
       disease_name: result.disease,
-      confidence: result.confidence || 0.947,
+      confidence: result.confidence_normalized || (result.confidence_pct ? result.confidence_pct / 100 : 0.947),
       severity: result.severity || 'Moderate',
       affected_area_pct: result.affected_area_pct || 37.0,
       latitude: gpsCoords.lat,
@@ -70,7 +141,8 @@ export const DiseaseResultPage = ({ result, onSubmitted, onNavigateMarketplace }
       image_url: result.previewUrl || 'https://images.unsplash.com/photo-1592417817098-8f3d6eb22510?w=600&auto=format&fit=crop&q=80',
       mask_url: result.mask_data_uri,
       farmer_notes: farmerNotes,
-      is_offline: !navigator.onLine
+      is_offline: !navigator.onLine,
+      is_demo: false
     };
 
     try {
@@ -316,19 +388,113 @@ export const DiseaseResultPage = ({ result, onSubmitted, onNavigateMarketplace }
         </div>
       </div>
 
-      {/* GPS Reporting & Officer Submission */}
+      {/* Real GPS Geolocation & Surveillance Reporting */}
       <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-emerald-400" />
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5" />
+            </div>
             <div>
-              <h3 className="text-sm font-bold">Community Disease Surveillance GPS Tagging</h3>
-              <p className="text-[11px] text-slate-400">Transform individual observation into early community warnings</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold">Crop Geolocation & Disease Surveillance</h3>
+                {gpsCoords.isReal ? (
+                  <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+                    REAL GPS VERIFIED
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                    REGIONAL DEFAULT
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                📍 Location detected: Lat: <strong className="text-emerald-400 font-mono">{gpsCoords.lat.toFixed(5)}°</strong>, Lng: <strong className="text-emerald-400 font-mono">{gpsCoords.lng.toFixed(5)}°</strong>, Accuracy: <strong className="text-emerald-400 font-mono">±{gpsCoords.accuracy}m</strong>
+              </p>
             </div>
           </div>
-          <span className="text-[11px] font-mono bg-slate-800 text-emerald-400 px-3 py-1 rounded-full border border-slate-700">
-            GPS: {gpsCoords.lat.toFixed(4)}° N, {gpsCoords.lng.toFixed(4)}° E (±{gpsCoords.accuracy}m)
-          </span>
+
+          <button
+            type="button"
+            onClick={fetchLiveGPS}
+            disabled={isLocating}
+            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin' : ''}`} />
+            <span>{isLocating ? 'Acquiring GPS...' : 'Use My Current Location'}</span>
+          </button>
+        </div>
+
+        {gpsErrorMsg && (
+          <div className="p-3 bg-rose-950/60 border border-rose-800 text-rose-200 text-xs rounded-xl flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <div className="flex-1">
+              <span className="font-semibold">{gpsErrorMsg}</span>
+            </div>
+            <button
+              onClick={fetchLiveGPS}
+              className="text-xs bg-rose-800 hover:bg-rose-700 px-2.5 py-1 rounded-lg text-white font-bold"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Interactive Leaflet Mini-Map */}
+        <div className="w-full h-44 rounded-2xl overflow-hidden border border-slate-700 relative z-0">
+          <MapContainer
+            center={[gpsCoords.lat, gpsCoords.lng]}
+            zoom={14}
+            scrollWheelZoom={false}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <MiniMapRecenter center={[gpsCoords.lat, gpsCoords.lng]} />
+            <TileLayer
+              attribution='&copy; OpenStreetMap'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <Circle
+              center={[gpsCoords.lat, gpsCoords.lng]}
+              radius={Math.max(15, gpsCoords.accuracy || 20)}
+              pathOptions={{ color: '#10b981', fillColor: '#34d399', fillOpacity: 0.25 }}
+            />
+            <CircleMarker
+              center={[gpsCoords.lat, gpsCoords.lng]}
+              radius={8}
+              pathOptions={{ color: '#ffffff', fillColor: '#10b981', fillOpacity: 1, weight: 2 }}
+            >
+              <Popup>
+                <div className="text-xs font-sans text-slate-900 p-1">
+                  <strong className="block text-emerald-700">🌱 Scanned Plant Location</strong>
+                  <span>Lat: {gpsCoords.lat.toFixed(5)}°</span><br />
+                  <span>Lng: {gpsCoords.lng.toFixed(5)}°</span><br />
+                  <span className="text-[10px] text-slate-500">Accuracy: ±{gpsCoords.accuracy}m</span>
+                </div>
+              </Popup>
+            </CircleMarker>
+          </MapContainer>
+        </div>
+
+        {/* Locality Fields */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div>
+            <label className="block text-slate-400 mb-1 font-semibold">Village / Field Area</label>
+            <input
+              type="text"
+              value={gpsCoords.village}
+              onChange={(e) => setGpsCoords({ ...gpsCoords, village: e.target.value })}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1 font-semibold">District</label>
+            <input
+              type="text"
+              value={gpsCoords.district}
+              onChange={(e) => setGpsCoords({ ...gpsCoords, district: e.target.value })}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+            />
+          </div>
         </div>
 
         <div>
@@ -350,15 +516,15 @@ export const DiseaseResultPage = ({ result, onSubmitted, onNavigateMarketplace }
           </span>
 
           {submitted ? (
-            <div className="bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5">
+            <div className="bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm">
               <CheckCircle2 className="w-4 h-4" />
-              <span>Report Submitted & GPS Logged!</span>
+              <span>Report Submitted & Live GPS Logged!</span>
             </div>
           ) : (
             <button
               onClick={handleSubmitReport}
               disabled={submitting}
-              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition"
+              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition cursor-pointer"
             >
               <Send className="w-4 h-4" />
               <span>{submitting ? 'Submitting to Surveillance Database...' : t('submit_report', 'Submit Disease Report')}</span>
